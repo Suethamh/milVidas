@@ -74,19 +74,64 @@ db.run(`CREATE TABLE IF NOT EXISTS META_LEITURA (
 )`);
 saveDb();
 
+// ── Auto-seed: popular banco se estiver vazio ──
+const isEmpty = get('SELECT COUNT(*) as count FROM LIVROS');
+if (isEmpty.count === 0) {
+  console.log('Banco vazio detectado — populando com dados iniciais...');
+  const now = '2026-03-06T10:00:00';
+  const seedLivros = [
+    ['wrOQLV6xB-wC', 'Harry Potter e a Pedra Filosofal', 'J.K. Rowling', 'https://books.google.com/books/content?id=wrOQLV6xB-wC&printsec=frontcover&img=1&zoom=1&edge=curl&source=gbs_api', 'Harry Potter nunca tinha ouvido falar em Hogwarts até o momento em que as cartas começam a aparecer no capacho do número 4 da rua dos Alfeneiros.', 'Rocco', '9788532511010', 264, 'Fantasia', '1997', 'pt-BR'],
+    ['k6DwzwEACAAJ', 'O Senhor dos Anéis: A Sociedade do Anel', 'J.R.R. Tolkien', 'https://books.google.com/books/content?id=R7KuDwAAQBAJ&printsec=frontcover&img=1&zoom=1&edge=curl&source=gbs_api', 'Numa cidadezinha indolente do Condado, o jovem hobbit Frodo recebe um presente de seu tio Bilbo: um anel mágico.', 'Martins Fontes', '9788533613379', 576, 'Fantasia', '1954', 'pt-BR'],
+    ['HCo1DwAAQBAJ', '1984', 'George Orwell', 'https://books.google.com/books/content?id=HCo1DwAAQBAJ&printsec=frontcover&img=1&zoom=1&edge=curl&source=gbs_api', 'Winston Smith trabalha no Ministério da Verdade, em Londres, adaptando a realidade dos fatos à versão oficial do Partido.', 'Companhia das Letras', '9788535914849', 416, 'Ficção Científica', '1949', 'pt-BR'],
+    ['MZHORAS_bLcC', 'Dom Casmurro', 'Machado de Assis', 'https://books.google.com/books/content?id=MZHORAS_bLcC&printsec=frontcover&img=1&zoom=1&edge=curl&source=gbs_api', 'Bento Santiago, o Dom Casmurro, narra a história de seu amor por Capitu, a vizinha de olhos de ressaca.', 'Penguin-Companhia', '9788582850350', 256, 'Romance', '1899', 'pt-BR'],
+    ['FmyBAwAAQBAJ', 'O Pequeno Príncipe', 'Antoine de Saint-Exupéry', 'https://books.google.com/books/content?id=FmyBAwAAQBAJ&printsec=frontcover&img=1&zoom=1&edge=curl&source=gbs_api', 'Um piloto cai com seu avião no deserto do Saara e encontra um pequeno príncipe, vindo de um longínquo asteroide.', 'HarperCollins', '9788595081512', 96, 'Fábula', '1943', 'pt-BR'],
+    ['MAqQDwAAQBAJ', 'Cem Anos de Solidão', 'Gabriel García Márquez', 'https://books.google.com/books/content?id=MAqQDwAAQBAJ&printsec=frontcover&img=1&zoom=1&edge=curl&source=gbs_api', 'A história da família Buendía na mítica cidade de Macondo, ao longo de sete gerações.', 'Record', '9788501012173', 448, 'Realismo Mágico', '1967', 'pt-BR'],
+    ['ydQiDQAAQBAJ', 'Sapiens: Uma Breve História da Humanidade', 'Yuval Noah Harari', 'https://books.google.com/books/publisher/content?id=ydQiDQAAQBAJ&printsec=frontcover&img=1&zoom=1&source=gbs_api', 'O que possibilitou ao Homo sapiens subjugar as demais espécies?', 'L&PM', '9788525432186', 464, 'Não-ficção', '2011', 'pt-BR'],
+    ['NGbWnQEACAAJ', 'A Revolução dos Bichos', 'George Orwell', 'https://books.google.com/books/content?id=NGbWnQEACAAJ&printsec=frontcover&img=1&zoom=1&edge=curl&source=gbs_api', 'Os animais da Granja do Solar, cansados da exploração, expulsam os humanos e criam suas próprias regras de convivência.', 'Companhia das Letras', '9788535909555', 152, 'Sátira', '1945', 'pt-BR'],
+  ];
+  for (const l of seedLivros) {
+    db.run(`INSERT INTO LIVROS (GOOGLE_BOOKS_ID, TITULO, AUTOR, CAPA_URL, SINOPSE, EDITORA, ISBN, PAGINAS, GENERO, ANO_PUBLICACAO, IDIOMA, CRIADO_EM) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [...l, now]);
+  }
+  const seedBib = [
+    [1, 'LIDO', null, null, '2026-01-05T09:00:00', '2026-01-05T09:00:00', '2026-01-18T21:00:00'],
+    [2, 'LIDO', null, null, '2026-01-20T10:00:00', '2026-01-20T10:00:00', '2026-02-10T18:00:00'],
+    [3, 'LENDO', null, null, '2026-02-15T08:00:00', '2026-02-20T08:00:00', null],
+    [4, 'LIDO', null, null, '2025-12-01T14:00:00', '2025-12-01T14:00:00', '2025-12-20T22:00:00'],
+    [5, 'WISHLIST', 'ALTA', null, '2026-03-01T11:00:00', null, null],
+    [6, 'PROXIMA_LEITURA', 'ALTA', 1, '2026-02-28T15:00:00', null, null],
+    [7, 'PROXIMA_LEITURA', 'MEDIA', 2, '2026-03-02T09:00:00', null, null],
+    [8, 'WISHLIST', 'MEDIA', null, '2026-03-04T16:00:00', null, null],
+  ];
+  for (const b of seedBib) {
+    db.run(`INSERT INTO BIBLIOTECA (LIVRO_ID, STATUS, PRIORIDADE, POSICAO, DATA_ADICIONADO, DATA_INICIO, DATA_FIM, CRIADO_EM) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, [...b, now]);
+  }
+  const seedAval = [
+    [1, 5, 'Um clássico absoluto! A magia de Hogwarts me transportou para outro mundo.'],
+    [2, 5, 'A obra-prima da fantasia. Tolkien construiu um mundo com uma riqueza de detalhes impressionante.'],
+    [4, 4, 'Machado de Assis é genial. A narrativa em primeira pessoa nos deixa sempre em dúvida sobre Capitu.'],
+  ];
+  for (const a of seedAval) {
+    db.run('INSERT INTO AVALIACOES (BIBLIOTECA_ID, NOTA, REVIEW, CRIADO_EM) VALUES (?, ?, ?, ?)', [...a, now]);
+  }
+  const seedNotas = [
+    [1, 'O chapéu seletor é uma metáfora brilhante sobre as escolhas que fazemos na vida.', 88],
+    [1, 'A cena do espelho de Ojesed é de partir o coração.', 152],
+    [2, 'A descrição do Condado transmite uma paz absurda. Tolkien sabia criar atmosfera.', 25],
+    [3, 'A ideia de duplipensar é assustadoramente atual. Orwell era visionário.', 210],
+  ];
+  for (const n of seedNotas) {
+    db.run('INSERT INTO NOTAS_LEITURA (BIBLIOTECA_ID, TEXTO, PAGINA, CRIADO_EM) VALUES (?, ?, ?, ?)', [...n, now]);
+  }
+  db.run('INSERT INTO META_LEITURA (ANO, META_LIVROS, CRIADO_EM) VALUES (?, ?, ?)', [2026, 24, now]);
+  saveDb();
+  console.log('Auto-seed concluído: 8 livros, 8 biblioteca, 3 avaliações, 4 notas, 1 meta');
+}
+
 const GOOGLE_BOOKS_API_KEY = process.env.GOOGLE_BOOKS_API_KEY || 'AIzaSyA8FpQjUaCWtTir-EJhUjhFuJ09T3rqQ5I';
 
 // ── Servir frontend em produção ──
 const frontendPath = join(__dirname, '..', 'frontend', 'dist');
 app.use(express.static(frontendPath));
-
-// ── Diagnóstico (temporário) ──
-app.get('/api/debug/tables', (req, res) => {
-  const livros = all('SELECT ID, GOOGLE_BOOKS_ID, TITULO FROM LIVROS');
-  const biblioteca = all('SELECT ID, LIVRO_ID, STATUS FROM BIBLIOTECA');
-  const meta = all('SELECT * FROM META_LEITURA');
-  res.json({ livros, biblioteca, meta });
-});
 
 // ── Dashboard ──
 app.get('/api/dashboard/kpis', (req, res) => {
