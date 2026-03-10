@@ -74,7 +74,11 @@ db.run(`CREATE TABLE IF NOT EXISTS META_LEITURA (
 )`);
 saveDb();
 
-const GOOGLE_BOOKS_API_KEY = 'AIzaSyA8FpQjUaCWtTir-EJhUjhFuJ09T3rqQ5I';
+const GOOGLE_BOOKS_API_KEY = process.env.GOOGLE_BOOKS_API_KEY || 'AIzaSyA8FpQjUaCWtTir-EJhUjhFuJ09T3rqQ5I';
+
+// ── Servir frontend em produção ──
+const frontendPath = join(__dirname, '..', 'frontend', 'dist');
+app.use(express.static(frontendPath));
 
 // ── Dashboard ──
 app.get('/api/dashboard/kpis', (req, res) => {
@@ -470,7 +474,12 @@ app.get('/api/google-books/search', async (req, res) => {
   }
 });
 
-const PORT = 3001;
+// ── SPA fallback: qualquer rota não-API serve o index.html ──
+app.get('*', (req, res) => {
+  res.sendFile(join(frontendPath, 'index.html'));
+});
+
+const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`MilVidas API rodando em http://localhost:${PORT}`);
 });

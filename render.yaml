@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: milvidas
+    runtime: node
+    buildCommand: cd frontend && npm install && npm run build && cd ../backend && npm install
+    startCommand: cd backend && node server.js
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: GOOGLE_BOOKS_API_KEY
+        value: AIzaSyA8FpQjUaCWtTir-EJhUjhFuJ09T3rqQ5I
