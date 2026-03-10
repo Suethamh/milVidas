@@ -80,6 +80,14 @@ const GOOGLE_BOOKS_API_KEY = process.env.GOOGLE_BOOKS_API_KEY || 'AIzaSyA8FpQjUa
 const frontendPath = join(__dirname, '..', 'frontend', 'dist');
 app.use(express.static(frontendPath));
 
+// ── Diagnóstico (temporário) ──
+app.get('/api/debug/tables', (req, res) => {
+  const livros = all('SELECT ID, GOOGLE_BOOKS_ID, TITULO FROM LIVROS');
+  const biblioteca = all('SELECT ID, LIVRO_ID, STATUS FROM BIBLIOTECA');
+  const meta = all('SELECT * FROM META_LEITURA');
+  res.json({ livros, biblioteca, meta });
+});
+
 // ── Dashboard ──
 app.get('/api/dashboard/kpis', (req, res) => {
   const total = get('SELECT COUNT(*) as count FROM BIBLIOTECA');
