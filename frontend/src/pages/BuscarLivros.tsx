@@ -441,57 +441,89 @@ export default function BuscarLivros() {
         </>
       )}
 
-      <Modal open={!!modalBook} onClose={() => { setModalBook(null); setShowDateFields(false); setDataInicio(''); setDataFim(''); }} title="Adicionar à Biblioteca" size="sm">
-        <div ref={modalRef} className="flex flex-col gap-3">
-          <p className="text-sm text-text-secondary mb-2">
-            Onde deseja adicionar <strong>{modalBook?.volumeInfo?.title}</strong>?
-          </p>
-          <Button onClick={() => handleAdd('LENDO')} disabled={!!addingStatus}>
-            {addingStatus === 'LENDO' ? 'Adicionando...' : 'Lendo agora'}
-          </Button>
-          <Button variant="secondary" onClick={() => {
-            if (!showDateFields) {
-              setShowDateFields(true);
-              const hoje = new Date().toISOString().slice(0, 10);
-              setDataFim(hoje);
-              setDataInicio(hoje);
-            } else {
-              handleAdd('LIDO');
-            }
-          }} disabled={!!addingStatus}>
-            {addingStatus === 'LIDO' ? 'Adicionando...' : showDateFields ? 'Confirmar' : 'Lido'}
-          </Button>
-          {showDateFields && (
-            <div className="flex flex-col gap-2 px-1 py-2 rounded-lg bg-gray-50 border border-border">
-              <p className="text-xs text-text-secondary font-medium px-2">Quando você leu?</p>
-              <div className="flex gap-3 px-2">
-                <label className="flex-1">
-                  <span className="text-xs text-text-secondary">Início</span>
-                  <input
-                    type="date"
-                    value={dataInicio}
-                    onChange={e => setDataInicio(e.target.value)}
-                    className="w-full mt-0.5 px-2 py-1.5 rounded-md border border-border bg-white text-sm text-text focus:outline-none focus:ring-2 focus:ring-primary/30"
-                  />
-                </label>
-                <label className="flex-1">
-                  <span className="text-xs text-text-secondary">Fim</span>
-                  <input
-                    type="date"
-                    value={dataFim}
-                    onChange={e => setDataFim(e.target.value)}
-                    className="w-full mt-0.5 px-2 py-1.5 rounded-md border border-border bg-white text-sm text-text focus:outline-none focus:ring-2 focus:ring-primary/30"
-                  />
-                </label>
+      <Modal open={!!modalBook} onClose={() => { setModalBook(null); setShowDateFields(false); setDataInicio(''); setDataFim(''); }} title="Adicionar à Biblioteca" size="md">
+        <div ref={modalRef} className="flex flex-col gap-4">
+          {/* Detalhes do livro */}
+          {modalBook && (() => {
+            const vol = modalBook.volumeInfo;
+            const coverUrl = getThumb(modalBook, true);
+            const sinopse = vol.description || null;
+            return (
+              <div className="flex gap-4">
+                <div className="w-24 flex-shrink-0">
+                  <BookCover url={coverUrl} titulo={vol.title} size="full" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-text text-sm leading-snug">{vol.title}</h3>
+                  <p className="text-xs text-text-secondary mt-0.5">{vol.authors?.join(', ') || 'Desconhecido'}</p>
+                  <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-2 text-xs text-text-secondary">
+                    {vol.pageCount && <span>{vol.pageCount} pág.</span>}
+                    {vol.publishedDate && <span>{vol.publishedDate.slice(0, 4)}</span>}
+                    {vol.categories?.[0] && <span>{vol.categories[0]}</span>}
+                  </div>
+                  {sinopse && (
+                    <p className="text-xs text-text-secondary mt-2 line-clamp-5 leading-relaxed"
+                       dangerouslySetInnerHTML={{ __html: sinopse }}
+                    />
+                  )}
+                </div>
               </div>
-            </div>
-          )}
-          <Button variant="secondary" onClick={() => handleAdd('WISHLIST')} disabled={!!addingStatus}>
-            {addingStatus === 'WISHLIST' ? 'Adicionando...' : 'Lista de desejos'}
-          </Button>
-          <Button variant="secondary" onClick={() => handleAdd('PROXIMA_LEITURA')} disabled={!!addingStatus}>
-            {addingStatus === 'PROXIMA_LEITURA' ? 'Adicionando...' : 'Próximas leituras'}
-          </Button>
+            );
+          })()}
+
+          {/* Separador */}
+          <div className="border-t border-border" />
+
+          {/* Botões de ação */}
+          <p className="text-xs text-text-secondary font-medium">Adicionar como:</p>
+          <div className="flex flex-col gap-2">
+            <Button onClick={() => handleAdd('LENDO')} disabled={!!addingStatus}>
+              {addingStatus === 'LENDO' ? 'Adicionando...' : 'Lendo agora'}
+            </Button>
+            <Button variant="secondary" onClick={() => {
+              if (!showDateFields) {
+                setShowDateFields(true);
+                const hoje = new Date().toISOString().slice(0, 10);
+                setDataFim(hoje);
+                setDataInicio(hoje);
+              } else {
+                handleAdd('LIDO');
+              }
+            }} disabled={!!addingStatus}>
+              {addingStatus === 'LIDO' ? 'Adicionando...' : showDateFields ? 'Confirmar' : 'Lido'}
+            </Button>
+            {showDateFields && (
+              <div className="flex flex-col gap-2 px-1 py-2 rounded-lg bg-gray-50 border border-border">
+                <p className="text-xs text-text-secondary font-medium px-2">Quando leu?</p>
+                <div className="flex gap-3 px-2">
+                  <label className="flex-1">
+                    <span className="text-xs text-text-secondary">Início</span>
+                    <input
+                      type="date"
+                      value={dataInicio}
+                      onChange={e => setDataInicio(e.target.value)}
+                      className="w-full mt-0.5 px-2 py-1.5 rounded-md border border-border bg-white text-sm text-text focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    />
+                  </label>
+                  <label className="flex-1">
+                    <span className="text-xs text-text-secondary">Fim</span>
+                    <input
+                      type="date"
+                      value={dataFim}
+                      onChange={e => setDataFim(e.target.value)}
+                      className="w-full mt-0.5 px-2 py-1.5 rounded-md border border-border bg-white text-sm text-text focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    />
+                  </label>
+                </div>
+              </div>
+            )}
+            <Button variant="secondary" onClick={() => handleAdd('WISHLIST')} disabled={!!addingStatus}>
+              {addingStatus === 'WISHLIST' ? 'Adicionando...' : 'Lista de desejos'}
+            </Button>
+            <Button variant="secondary" onClick={() => handleAdd('PROXIMA_LEITURA')} disabled={!!addingStatus}>
+              {addingStatus === 'PROXIMA_LEITURA' ? 'Adicionando...' : 'Próximas leituras'}
+            </Button>
+          </div>
         </div>
       </Modal>
     </div>
