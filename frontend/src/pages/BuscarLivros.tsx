@@ -38,6 +38,8 @@ export default function BuscarLivros() {
   const [recomendacoes, setRecomendacoes] = useState<any[]>([]);
   const [loadingRec, setLoadingRec] = useState(true);
   const [justAdded, setJustAdded] = useState<string | null>(null);
+  const [modalSinopse, setModalSinopse] = useState<string | null>(null);
+  const [loadingSinopse, setLoadingSinopse] = useState(false);
   // Para paginação: rastrear query real e se é filtrada
   const [lastApiQuery, setLastApiQuery] = useState('');
   const [lastFiltered, setLastFiltered] = useState(false);
@@ -129,7 +131,7 @@ export default function BuscarLivros() {
         TITULO: vol.title || 'Sem título',
         AUTOR: vol.authors?.join(', ') || 'Desconhecido',
         CAPA_URL: modalBook._bestCoverUrl || vol.imageLinks?.thumbnail || vol.imageLinks?.smallThumbnail || null,
-        SINOPSE: vol.description || null,
+        SINOPSE: modalSinopse || vol.description || null,
         EDITORA: vol.publisher || null,
         ISBN: vol.industryIdentifiers?.[0]?.identifier || null,
         PAGINAS: vol.pageCount || null,
@@ -190,6 +192,22 @@ export default function BuscarLivros() {
       url = url.replace(/&edge=curl/, '').replace(/zoom=\d/, 'zoom=3');
     }
     return url;
+  }
+
+  async function openModal(item: any) {
+    setModalBook(item);
+    setModalSinopse(null);
+    setLoadingSinopse(true);
+    try {
+      const resp = await fetch(`/api/google-books/sinopse/${item.id}`);
+      const data = await resp.json();
+      if (data.sinopse) {
+        setModalSinopse(data.sinopse);
+      }
+    } catch {
+      // Manter a sinopse original se falhar
+    }
+    setLoadingSinopse(false);
   }
 
   function handleCategoriaClick(cat: string) {
@@ -334,7 +352,7 @@ export default function BuscarLivros() {
                       ) : (
                         <div
                           className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer"
-                          onClick={() => setModalBook(item)}
+                          onClick={() => openModal(item)}
                         >
                           <div className="bg-white/90 text-text font-medium text-sm px-5 py-2.5 rounded-full flex items-center gap-2 shadow-lg backdrop-blur-sm">
                             <Plus size={16} /> Adicionar
@@ -406,7 +424,7 @@ export default function BuscarLivros() {
                     ) : (
                       <div
                         className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer"
-                        onClick={() => setModalBook(item)}
+                        onClick={() => openModal(item)}
                       >
                         <div className="bg-white/90 text-text font-medium text-sm px-5 py-2.5 rounded-full flex items-center gap-2 shadow-lg backdrop-blur-sm">
                           <Plus size={16} /> Adicionar
@@ -441,13 +459,13 @@ export default function BuscarLivros() {
         </>
       )}
 
-      <Modal open={!!modalBook} onClose={() => { setModalBook(null); setShowDateFields(false); setDataInicio(''); setDataFim(''); }} title="Adicionar à Biblioteca" size="md">
+      <Modal open={!!modalBook} onClose={() => { setModalBook(null); setModalSinopse(null); setShowDateFields(false); setDataInicio(''); setDataFim(''); }} title="Adicionar à Biblioteca" size="md">
         <div ref={modalRef} className="flex flex-col gap-4">
           {/* Detalhes do livro */}
           {modalBook && (() => {
             const vol = modalBook.volumeInfo;
             const coverUrl = getThumb(modalBook, true);
-            const sinopse = vol.description || null;
+            const sinopse = modalSinopse || vol.description || null;
             return (
               <div className="flex gap-4">
                 <div className="w-24 flex-shrink-0">
@@ -461,10 +479,17 @@ export default function BuscarLivros() {
                     {vol.publishedDate && <span>{vol.publishedDate.slice(0, 4)}</span>}
                     {vol.categories?.[0] && <span>{vol.categories[0]}</span>}
                   </div>
-                  {sinopse && (
-                    <p className="text-xs text-text-secondary mt-2 line-clamp-5 leading-relaxed"
+                  {loadingSinopse ? (
+                    <div className="mt-2 flex items-center gap-2 text-xs text-text-secondary">
+                      <div className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                      Buscando sinopse...
+                    </div>
+                  ) : sinopse ? (
+                    <p className="text-xs text-text-secondary mt-2 line-clamp-6 leading-relaxed"
                        dangerouslySetInnerHTML={{ __html: sinopse }}
                     />
+                  ) : (
+                    <p className="text-xs text-text-secondary/60 mt-2 italic">Sinopse indisponível</p>
                   )}
                 </div>
               </div>

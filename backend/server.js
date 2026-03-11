@@ -463,6 +463,51 @@ app.get('/api/livros/verificar-capa', async (req, res) => {
   } catch (e) { res.json({ real: false }); }
 });
 
+// ── Buscar sinopse em pt-BR (fallback: en, qualquer idioma) ──
+app.get('/api/google-books/sinopse/:volumeId', async (req, res) => {
+  try {
+    const { volumeId } = req.params;
+
+    // 1. Buscar detalhes do volume original
+    const volResp = await fetch(`https://www.googleapis.com/books/v1/volumes/${volumeId}?key=${GOOGLE_BOOKS_API_KEY}`);
+    const volData = await volResp.json();
+    const titulo = volData.volumeInfo?.title || '';
+    const autor = volData.volumeInfo?.authors?.[0] || '';
+    const descOriginal = volData.volumeInfo?.description || null;
+
+    // 2. Tentar buscar edição em pt-BR
+    if (titulo) {
+      const qPt = encodeURIComponent(`${titulo} ${autor}`);
+      const ptResp = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${qPt}&langRestrict=pt&maxResults=3&key=${GOOGLE_BOOKS_API_KEY}`);
+      const ptData = await ptResp.json();
+      const ptItem = ptData.items?.find(i => i.volumeInfo?.description);
+      if (ptItem?.volumeInfo?.description) {
+        return res.json({ sinopse: ptItem.volumeInfo.description, idioma: 'pt' });
+      }
+    }
+
+    // 3. Fallback: descrição original (pode ser en ou outro idioma)
+    if (descOriginal) {
+      return res.json({ sinopse: descOriginal, idioma: volData.volumeInfo?.language || 'en' });
+    }
+
+    // 4. Tentar busca genérica sem restrição de idioma
+    if (titulo) {
+      const qAny = encodeURIComponent(`${titulo} ${autor}`);
+      const anyResp = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${qAny}&maxResults=5&key=${GOOGLE_BOOKS_API_KEY}`);
+      const anyData = await anyResp.json();
+      const anyItem = anyData.items?.find(i => i.volumeInfo?.description);
+      if (anyItem?.volumeInfo?.description) {
+        return res.json({ sinopse: anyItem.volumeInfo.description, idioma: anyItem.volumeInfo?.language || 'unknown' });
+      }
+    }
+
+    res.json({ sinopse: null, idioma: null });
+  } catch (e) {
+    res.json({ sinopse: null, idioma: null });
+  }
+});
+
 app.get('/api/livros/verificar/:googleBooksId', async (req, res) => {
   try {
     const livro = await get(`
