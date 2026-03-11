@@ -394,6 +394,28 @@ app.post('/api/meta', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ── Verificar se capa é real (JPEG) ou placeholder (PNG) ──
+async function verificarCapaReal(capaUrl) {
+  if (!capaUrl || (!capaUrl.includes('books.google') && !capaUrl.includes('googleapis.com/books'))) {
+    return capaUrl; // Não é Google Books, manter como está
+  }
+  try {
+    const baseUrl = capaUrl.replace(/&edge=curl/g, '');
+    // Tentar zoom=3 (melhor resolução)
+    const zoom3Url = baseUrl.replace(/zoom=\d/, 'zoom=3');
+    const resp3 = await fetch(zoom3Url, { method: 'HEAD' });
+    if (resp3.headers.get('content-type')?.includes('jpeg')) return zoom3Url;
+    // Tentar zoom=1 (mais confiável)
+    const zoom1Url = baseUrl.replace(/zoom=\d/, 'zoom=1');
+    const resp1 = await fetch(zoom1Url, { method: 'HEAD' });
+    if (resp1.headers.get('content-type')?.includes('jpeg')) return zoom1Url;
+    // Ambos são PNG (placeholder) — sem capa real
+    return null;
+  } catch {
+    return capaUrl; // Erro de rede, manter URL original
+  }
+}
+
 // ── Livros ──
 app.post('/api/livros', async (req, res) => {
   try {
@@ -405,12 +427,24 @@ app.post('/api/livros', async (req, res) => {
       res.json({ id: existing.ID, existing: true });
       return;
     }
+    // Verificar se a capa é real antes de salvar
+    const capaVerificada = await verificarCapaReal(capaHttps);
     const result = await run(
       `INSERT INTO LIVROS (GOOGLE_BOOKS_ID, TITULO, AUTOR, CAPA_URL, SINOPSE, EDITORA, ISBN, PAGINAS, GENERO, ANO_PUBLICACAO, IDIOMA, CRIADO_EM)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [GOOGLE_BOOKS_ID, TITULO, AUTOR, capaHttps, SINOPSE || null, EDITORA || null, ISBN || null, PAGINAS || null, GENERO || null, ANO_PUBLICACAO || null, IDIOMA || null, now]);
+      [GOOGLE_BOOKS_ID, TITULO, AUTOR, capaVerificada, SINOPSE || null, EDITORA || null, ISBN || null, PAGINAS || null, GENERO || null, ANO_PUBLICACAO || null, IDIOMA || null, now]);
     res.json({ id: result.lastInsertRowid });
   } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Endpoint para verificar se URL de capa é real (usado pelo frontend)
+app.get('/api/livros/verificar-capa', async (req, res) => {
+  try {
+    const { url } = req.query;
+    if (!url) return res.json({ real: false });
+    const resultado = await verificarCapaReal(url);
+    res.json({ real: resultado !== null, url: resultado });
+  } catch (e) { res.json({ real: false }); }
 });
 
 app.get('/api/livros/verificar/:googleBooksId', async (req, res) => {

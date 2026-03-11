@@ -29,27 +29,71 @@ function isGoogleBooksUrl(url: string): boolean {
   return url.includes('books.google') || url.includes('googleapis.com/books');
 }
 
-function processUrl(url: string, zoom?: number): string {
-  let processed = url.replace(/^http:/, 'https:');
-  if (isGoogleBooksUrl(processed)) {
-    processed = processed.replace(/&edge=curl/g, '');
-    if (zoom !== undefined) {
-      processed = processed.replace(/zoom=\d/, `zoom=${zoom}`);
-    }
-  }
-  return processed;
-}
+// Cache global de verificação de capas (evita re-verificar a mesma URL)
+const coverCache = new Map<string, string | null>();
 
 export function BookCover({ url, titulo, className = '', size = 'md' }: BookCoverProps) {
-  const [state, setState] = React.useState<'loading' | 'zoom3' | 'zoom1' | 'fallback'>('loading');
+  const [state, setState] = React.useState<'loading' | 'verified' | 'fallback'>('loading');
+  const [verifiedUrl, setVerifiedUrl] = React.useState<string | null>(null);
   const isFull = size === 'full';
 
-  // Reset state when URL changes
   React.useEffect(() => {
+    if (!url) {
+      setState('fallback');
+      return;
+    }
+
+    // URL não é do Google Books — usar diretamente
+    if (!isGoogleBooksUrl(url)) {
+      setVerifiedUrl(url.replace(/^http:/, 'https:'));
+      setState('verified');
+      return;
+    }
+
+    // Checar cache
+    const cached = coverCache.get(url);
+    if (cached !== undefined) {
+      if (cached) {
+        setVerifiedUrl(cached);
+        setState('verified');
+      } else {
+        setState('fallback');
+      }
+      return;
+    }
+
+    // Verificar com o backend se a capa é real
     setState('loading');
+    fetch(`/api/livros/verificar-capa?url=${encodeURIComponent(url)}`)
+      .then(r => r.json())
+      .then(data => {
+        coverCache.set(url, data.real ? data.url : null);
+        if (data.real && data.url) {
+          setVerifiedUrl(data.url);
+          setState('verified');
+        } else {
+          setState('fallback');
+        }
+      })
+      .catch(() => {
+        // Se falhar a verificação, tenta usar a URL original
+        setVerifiedUrl(url.replace(/^http:/, 'https:').replace(/&edge=curl/g, ''));
+        setState('verified');
+      });
   }, [url]);
 
-  if (!url || state === 'fallback') {
+  // Loading: mostrar skeleton
+  if (state === 'loading') {
+    return (
+      <div
+        className={`${sizes[size]} rounded-xl bg-white/10 animate-pulse shadow-lg overflow-hidden ${className}`}
+        style={{ aspectRatio: '2/3' }}
+      />
+    );
+  }
+
+  // Fallback: gradiente bonito com iniciais
+  if (state === 'fallback' || !verifiedUrl) {
     return (
       <div
         className={`${sizes[size]} rounded-xl flex items-center justify-center bg-gradient-to-br from-pink-400 via-purple-500 to-blue-500 shadow-lg overflow-hidden ${className}`}
@@ -62,38 +106,12 @@ export function BookCover({ url, titulo, className = '', size = 'md' }: BookCove
     );
   }
 
-  // Determinar qual URL mostrar
-  let displayUrl: string;
-  if (isGoogleBooksUrl(url)) {
-    if (state === 'zoom1') {
-      // Fallback para zoom=1 (mais confiável, mostra capa real)
-      displayUrl = processUrl(url, 1);
-    } else {
-      // Tentar zoom=3 primeiro (melhor resolução)
-      displayUrl = processUrl(url, 3);
-    }
-  } else {
-    displayUrl = processUrl(url);
-  }
-
+  // Capa verificada
   return (
     <img
-      src={displayUrl}
+      src={verifiedUrl}
       alt={titulo || 'Capa do livro'}
-      onLoad={() => {
-        if (state === 'loading') setState('zoom3');
-      }}
-      onError={() => {
-        if (state === 'loading' && isGoogleBooksUrl(url)) {
-          // zoom=3 falhou, tentar zoom=1
-          setState('zoom1');
-        } else if (state === 'zoom1' || !isGoogleBooksUrl(url)) {
-          // zoom=1 também falhou ou não é Google Books, mostrar fallback
-          setState('fallback');
-        } else {
-          setState('fallback');
-        }
-      }}
+      onError={() => setState('fallback')}
       className={`${sizes[size]} rounded-xl object-cover shadow-lg ${className}`}
       style={{ aspectRatio: '2/3' }}
     />
