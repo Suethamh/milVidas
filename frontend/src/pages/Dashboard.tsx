@@ -2,6 +2,7 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { BookOpen, BookCheck, Eye, Heart, Star, StickyNote, Plus, ChevronRight } from 'lucide-react';
 import { getDashboardKpis, getLendoAgora, getAtividadeRecente, getRecentes } from '../lib/api';
+import { LoveMessage } from '../components/LoveMessage';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { BookCover } from '../components/BookCover';
 import { Button } from '../components/ui/Button';
@@ -74,6 +75,10 @@ export default function Dashboard() {
             <Plus size={16} /> <span className="hidden sm:inline">Buscar</span> Livros
           </Button>
         </Link>
+      </div>
+
+      <div className="mb-4">
+        <LoveMessage />
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6 md:mb-8">

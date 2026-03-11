@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
 import { BookOpen, LayoutDashboard, Library, Search, Heart, BarChart3, Menu, X, BookCheck } from 'lucide-react';
 import { InstallPWA } from './InstallPWA';
+import { LoveMessage } from './LoveMessage';
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -77,8 +78,9 @@ export function Layout() {
           ))}
         </nav>
 
-        <div className="p-4 border-t border-border lg:border-white/20">
+        <div className="p-4 border-t border-border lg:border-white/20 flex flex-col items-center gap-1">
           <p className="text-xs text-text-secondary lg:text-white/50 text-center">MilVidas v1.0</p>
+          <LoveMessage />
         </div>
       </aside>
 
