@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
 import { BookOpen, LayoutDashboard, Library, Search, Heart, BarChart3, Menu, X, BookCheck } from 'lucide-react';
+import { InstallPWA } from './InstallPWA';
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -85,6 +86,8 @@ export function Layout() {
       <main className="flex-1 min-w-0 lg:ml-60 pt-16 lg:pt-8 px-3 pb-4 md:p-6 lg:p-8 min-h-screen overflow-x-hidden">
         <Outlet />
       </main>
+
+      <InstallPWA />
     </div>
   );
 }
