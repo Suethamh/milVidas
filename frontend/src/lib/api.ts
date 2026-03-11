@@ -36,6 +36,9 @@ export const atualizarBiblioteca = (id: number, data: any) =>
 export const removerBiblioteca = (id: number) =>
   request<any>(`/biblioteca/${id}`, { method: 'DELETE' });
 
+export const reordenarBiblioteca = (items: { id: number; posicao: number }[]) =>
+  request<any>('/biblioteca/reordenar', { method: 'PUT', body: JSON.stringify({ items }) });
+
 // Notas
 export const getNotas = (bibliotecaId: number) =>
   request<any[]>(`/notas/${bibliotecaId}`);

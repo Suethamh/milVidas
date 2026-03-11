@@ -243,6 +243,22 @@ app.patch('/api/biblioteca/:id', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ── Reordenar batch (drag & drop) ──
+app.put('/api/biblioteca/reordenar', async (req, res) => {
+  try {
+    const { items } = req.body; // [{ id, posicao }]
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'items é obrigatório' });
+    }
+    const stmts = items.map(({ id, posicao }) => ({
+      sql: 'UPDATE BIBLIOTECA SET POSICAO = ? WHERE ID = ?',
+      args: [posicao, id],
+    }));
+    await db.batch(stmts);
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.delete('/api/biblioteca/:id', async (req, res) => {
   try {
     const id = Number(req.params.id);
