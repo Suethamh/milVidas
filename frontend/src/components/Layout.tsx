@@ -82,7 +82,7 @@ export function Layout() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 lg:ml-60 pt-16 lg:pt-8 px-3 pb-4 md:p-6 lg:p-8 min-h-screen">
+      <main className="flex-1 min-w-0 lg:ml-60 pt-16 lg:pt-8 px-3 pb-4 md:p-6 lg:p-8 min-h-screen overflow-x-hidden">
         <Outlet />
       </main>
     </div>
