@@ -1,17 +1,20 @@
-import initSqlJs from 'sql.js';
-import { writeFileSync } from 'fs';
+import { createClient } from '@libsql/client';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const DB_PATH = join(__dirname, 'milvidas.db');
 
 const GOOGLE_BOOKS_API_KEY = 'AIzaSyA8FpQjUaCWtTir-EJhUjhFuJ09T3rqQ5I';
 
+// Conecta ao Turso (produção) ou SQLite local (dev)
+const db = createClient({
+  url: process.env.TURSO_DATABASE_URL || `file:${join(__dirname, 'milvidas.db')}`,
+  authToken: process.env.TURSO_AUTH_TOKEN,
+});
+
 async function fetchGoogleBooksCover(googleBooksId, titulo, autor) {
   try {
-    // Try direct volume lookup first
     const url = `https://www.googleapis.com/books/v1/volumes/${googleBooksId}?key=${GOOGLE_BOOKS_API_KEY}`;
     const res = await fetch(url);
     const data = await res.json();
@@ -19,7 +22,6 @@ async function fetchGoogleBooksCover(googleBooksId, titulo, autor) {
     const thumb = links?.thumbnail || links?.smallThumbnail || null;
     if (thumb) return thumb.replace(/^http:/, 'https:');
 
-    // Fallback: search by title + author
     const searchUrl = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(titulo + ' ' + autor)}&maxResults=3&key=${GOOGLE_BOOKS_API_KEY}`;
     const searchRes = await fetch(searchUrl);
     const searchData = await searchRes.json();
@@ -35,35 +37,42 @@ async function fetchGoogleBooksCover(googleBooksId, titulo, autor) {
   }
 }
 
-const SQL = await initSqlJs();
-const db = new SQL.Database();
-
 // Create tables
-db.run(`CREATE TABLE IF NOT EXISTS LIVROS (
-  ID INTEGER PRIMARY KEY AUTOINCREMENT,
-  GOOGLE_BOOKS_ID TEXT UNIQUE, TITULO TEXT, AUTOR TEXT, CAPA_URL TEXT, SINOPSE TEXT,
-  EDITORA TEXT, ISBN TEXT, PAGINAS INTEGER, GENERO TEXT, ANO_PUBLICACAO TEXT, IDIOMA TEXT, CRIADO_EM TEXT
-)`);
-db.run(`CREATE TABLE IF NOT EXISTS BIBLIOTECA (
-  ID INTEGER PRIMARY KEY AUTOINCREMENT,
-  LIVRO_ID INTEGER REFERENCES LIVROS(ID), STATUS TEXT, PRIORIDADE TEXT, POSICAO INTEGER,
-  DATA_ADICIONADO TEXT, DATA_INICIO TEXT, DATA_FIM TEXT, CRIADO_EM TEXT
-)`);
-db.run(`CREATE TABLE IF NOT EXISTS AVALIACOES (
-  ID INTEGER PRIMARY KEY AUTOINCREMENT,
-  BIBLIOTECA_ID INTEGER UNIQUE REFERENCES BIBLIOTECA(ID), NOTA INTEGER, REVIEW TEXT, CRIADO_EM TEXT
-)`);
-db.run(`CREATE TABLE IF NOT EXISTS NOTAS_LEITURA (
-  ID INTEGER PRIMARY KEY AUTOINCREMENT,
-  BIBLIOTECA_ID INTEGER REFERENCES BIBLIOTECA(ID), TEXTO TEXT, PAGINA INTEGER, CRIADO_EM TEXT
-)`);
-db.run(`CREATE TABLE IF NOT EXISTS META_LEITURA (
-  ID INTEGER PRIMARY KEY AUTOINCREMENT, ANO INTEGER, META_LIVROS INTEGER, CRIADO_EM TEXT
-)`);
+await db.batch([
+  { sql: `CREATE TABLE IF NOT EXISTS LIVROS (
+    ID INTEGER PRIMARY KEY AUTOINCREMENT,
+    GOOGLE_BOOKS_ID TEXT UNIQUE, TITULO TEXT, AUTOR TEXT, CAPA_URL TEXT, SINOPSE TEXT,
+    EDITORA TEXT, ISBN TEXT, PAGINAS INTEGER, GENERO TEXT, ANO_PUBLICACAO TEXT, IDIOMA TEXT, CRIADO_EM TEXT
+  )` },
+  { sql: `CREATE TABLE IF NOT EXISTS BIBLIOTECA (
+    ID INTEGER PRIMARY KEY AUTOINCREMENT,
+    LIVRO_ID INTEGER REFERENCES LIVROS(ID), STATUS TEXT, PRIORIDADE TEXT, POSICAO INTEGER,
+    DATA_ADICIONADO TEXT, DATA_INICIO TEXT, DATA_FIM TEXT, CRIADO_EM TEXT
+  )` },
+  { sql: `CREATE TABLE IF NOT EXISTS AVALIACOES (
+    ID INTEGER PRIMARY KEY AUTOINCREMENT,
+    BIBLIOTECA_ID INTEGER UNIQUE REFERENCES BIBLIOTECA(ID), NOTA INTEGER, REVIEW TEXT, CRIADO_EM TEXT
+  )` },
+  { sql: `CREATE TABLE IF NOT EXISTS NOTAS_LEITURA (
+    ID INTEGER PRIMARY KEY AUTOINCREMENT,
+    BIBLIOTECA_ID INTEGER REFERENCES BIBLIOTECA(ID), TEXTO TEXT, PAGINA INTEGER, CRIADO_EM TEXT
+  )` },
+  { sql: `CREATE TABLE IF NOT EXISTS META_LEITURA (
+    ID INTEGER PRIMARY KEY AUTOINCREMENT, ANO INTEGER, META_LIVROS INTEGER, CRIADO_EM TEXT
+  )` },
+]);
+
+// Limpar dados antigos
+await db.batch([
+  { sql: 'DELETE FROM NOTAS_LEITURA' },
+  { sql: 'DELETE FROM AVALIACOES' },
+  { sql: 'DELETE FROM BIBLIOTECA' },
+  { sql: 'DELETE FROM LIVROS' },
+  { sql: 'DELETE FROM META_LEITURA' },
+]);
 
 const now = '2026-03-06T10:00:00';
 
-// Buscar capas reais da Google Books API
 console.log('Buscando capas da Google Books API...');
 
 const livrosData = [
@@ -77,19 +86,14 @@ const livrosData = [
   { id: 'NGbWnQEACAAJ', titulo: 'A Revolução dos Bichos', autor: 'George Orwell', sinopse: 'Os animais da Granja do Solar, cansados da exploração, expulsam os humanos e criam suas próprias regras de convivência.', editora: 'Companhia das Letras', isbn: '9788535909555', paginas: 152, genero: 'Sátira', ano: '1945', idioma: 'pt-BR' },
 ];
 
-const livros = [];
+const stmts = [];
 for (const l of livrosData) {
   const capaUrl = await fetchGoogleBooksCover(l.id, l.titulo, l.autor);
   console.log(`  ${l.titulo}: ${capaUrl ? 'OK' : 'sem capa'}`);
-  livros.push([l.id, l.titulo, l.autor, capaUrl, l.sinopse, l.editora, l.isbn, l.paginas, l.genero, l.ano, l.idioma]);
-}
-
-for (const l of livros) {
-  db.run(
-    `INSERT INTO LIVROS (GOOGLE_BOOKS_ID, TITULO, AUTOR, CAPA_URL, SINOPSE, EDITORA, ISBN, PAGINAS, GENERO, ANO_PUBLICACAO, IDIOMA, CRIADO_EM)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [...l, now]
-  );
+  stmts.push({
+    sql: `INSERT INTO LIVROS (GOOGLE_BOOKS_ID, TITULO, AUTOR, CAPA_URL, SINOPSE, EDITORA, ISBN, PAGINAS, GENERO, ANO_PUBLICACAO, IDIOMA, CRIADO_EM) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    args: [l.id, l.titulo, l.autor, capaUrl, l.sinopse, l.editora, l.isbn, l.paginas, l.genero, l.ano, l.idioma, now]
+  });
 }
 
 const bibliotecaEntries = [
@@ -102,13 +106,8 @@ const bibliotecaEntries = [
   [7, 'PROXIMA_LEITURA', 'MEDIA', 2, '2026-03-02T09:00:00', null, null],
   [8, 'WISHLIST', 'MEDIA', null, '2026-03-04T16:00:00', null, null],
 ];
-
 for (const b of bibliotecaEntries) {
-  db.run(
-    `INSERT INTO BIBLIOTECA (LIVRO_ID, STATUS, PRIORIDADE, POSICAO, DATA_ADICIONADO, DATA_INICIO, DATA_FIM, CRIADO_EM)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [...b, now]
-  );
+  stmts.push({ sql: `INSERT INTO BIBLIOTECA (LIVRO_ID, STATUS, PRIORIDADE, POSICAO, DATA_ADICIONADO, DATA_INICIO, DATA_FIM, CRIADO_EM) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, args: [...b, now] });
 }
 
 const avaliacoes = [
@@ -116,9 +115,8 @@ const avaliacoes = [
   [2, 5, 'A obra-prima da fantasia. Tolkien construiu um mundo com uma riqueza de detalhes impressionante.'],
   [4, 4, 'Machado de Assis é genial. A narrativa em primeira pessoa de Bentinho nos deixa sempre em dúvida sobre Capitu.'],
 ];
-
 for (const a of avaliacoes) {
-  db.run('INSERT INTO AVALIACOES (BIBLIOTECA_ID, NOTA, REVIEW, CRIADO_EM) VALUES (?, ?, ?, ?)', [...a, now]);
+  stmts.push({ sql: 'INSERT INTO AVALIACOES (BIBLIOTECA_ID, NOTA, REVIEW, CRIADO_EM) VALUES (?, ?, ?, ?)', args: [...a, now] });
 }
 
 const notas = [
@@ -127,15 +125,13 @@ const notas = [
   [2, 'A descrição do Condado transmite uma paz absurda. Tolkien sabia criar atmosfera como ninguém.', 25],
   [3, 'A ideia de duplipensar é assustadoramente atual. Orwell era visionário.', 210],
 ];
-
 for (const n of notas) {
-  db.run('INSERT INTO NOTAS_LEITURA (BIBLIOTECA_ID, TEXTO, PAGINA, CRIADO_EM) VALUES (?, ?, ?, ?)', [...n, now]);
+  stmts.push({ sql: 'INSERT INTO NOTAS_LEITURA (BIBLIOTECA_ID, TEXTO, PAGINA, CRIADO_EM) VALUES (?, ?, ?, ?)', args: [...n, now] });
 }
 
-db.run('INSERT INTO META_LEITURA (ANO, META_LIVROS, CRIADO_EM) VALUES (?, ?, ?)', [2026, 24, now]);
+stmts.push({ sql: 'INSERT INTO META_LEITURA (ANO, META_LIVROS, CRIADO_EM) VALUES (?, ?, ?)', args: [2026, 24, now] });
 
-const data = db.export();
-writeFileSync(DB_PATH, Buffer.from(data));
+await db.batch(stmts);
 
 console.log('Seed concluído com sucesso!');
 console.log('- 8 livros inseridos');
@@ -144,4 +140,4 @@ console.log('- 3 avaliações');
 console.log('- 4 notas de leitura');
 console.log('- 1 meta anual (24 livros para 2026)');
 
-db.close();
+process.exit(0);
